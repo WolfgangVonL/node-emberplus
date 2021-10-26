@@ -9,14 +9,14 @@ const winston = require("winston");
 
 class TreeServer extends EventEmitter{
     /**
-     * 
-     * @param {string} host 
-     * @param {number} port 
-     * @param {TreeNode} tree 
+     *
+     * @param {string} host
+     * @param {number} port
+     * @param {TreeNode} tree
      */
-    constructor(host, port, tree) {
+    constructor(host, port, tree, debug) {
         super();
-        this._debug = true;
+        this._debug = debug;
         this.timeoutValue = 2000;
         this.server = new S101Server(host, port);
         this.tree = tree;
@@ -24,10 +24,16 @@ class TreeServer extends EventEmitter{
         this.subscribers = {};
         this._handlers = new ElementHandlers(this);
 
+        if (this._debug === true) {
+          winston.level = 'debug';
+        }
+
         this.server.on('listening', () => {
             winston.debug("listening");
             this.emit('listening');
         });
+
+        this.setValueFn = null;
 
         this.server.on('connection', client => {
             winston.debug("ember new connection from", client.remoteAddress());
@@ -78,7 +84,7 @@ class TreeServer extends EventEmitter{
                 return reject(e);
             };
             if (this.server.server != null) {
-                this.server.server.close(cb);                
+                this.server.server.close(cb);
             }
             else {
                 cb();
@@ -88,8 +94,8 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {Matrix} matrix 
+     *
+     * @param {Matrix} matrix
      * @param {number} targetID
      * @returns {number}
      */
@@ -98,7 +104,7 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
+     *
      * @param {TreeNode} element
      * @returns {TreeNode}
      */
@@ -115,8 +121,8 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {TreeNode} element 
+     *
+     * @param {TreeNode} element
      */
     getQualifiedResponse(element) {
         const res = new EmberLib.Root();
@@ -137,9 +143,9 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {S101Client} client 
-     * @param {TreeNode} root 
+     *
+     * @param {S101Client} client
+     * @param {TreeNode} root
      */
     handleError(client, node) {
         if (client != null) {
@@ -149,19 +155,19 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {S101Socket} client 
-     * @param {TreeNode} root 
+     *
+     * @param {S101Socket} client
+     * @param {TreeNode} root
      */
     handleRoot(client, root) {
         if ((root == null) || (root.elements == null) || (root.elements.size < 1)) {
             // ignore empty requests.
             return;
         }
-    
+
         const node = root.getChildren()[0];
         client.request = node;
-    
+
         if (node.path != null) {
             return this._handlers.handleQualifiedNode(client, node);
         }
@@ -183,47 +189,47 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {string} path 
-     * @param {number} target 
-     * @param {number[]} sources 
+     *
+     * @param {string} path
+     * @param {number} target
+     * @param {number[]} sources
      */
     matrixConnect(path, target, sources) {
         doMatrixOperation(this, path, target, sources, EmberLib.MatrixOperation.connect);
     }
 
     /**
-     * 
-     * @param {string} path 
-     * @param {number} target 
-     * @param {number[]} sources 
+     *
+     * @param {string} path
+     * @param {number} target
+     * @param {number[]} sources
      */
     matrixDisconnect(path, target, sources) {
         doMatrixOperation(this, path, target, sources, EmberLib.MatrixOperation.disconnect);
     }
 
     /**
-     * 
-     * @param {string} path 
-     * @param {number} target 
-     * @param {number[]} sources 
+     *
+     * @param {string} path
+     * @param {number} target
+     * @param {number[]} sources
      */
     matrixSet(path, target, sources) {
         doMatrixOperation(this, path, target, sources, EmberLib.MatrixOperation.absolute);
     }
 
     /**
-     * 
-     * @param {Matrix} matrix 
-     * @param {number} target 
-     * @param {number[]} sources 
-     * @param {S101Socket} client 
-     * @param {boolean} response 
+     *
+     * @param {Matrix} matrix
+     * @param {number} target
+     * @param {number[]} sources
+     * @param {S101Socket} client
+     * @param {boolean} response
      */
     disconnectMatrixTarget(matrix, target, sources, client, response) {
         const disconnect = new EmberLib.MatrixConnection(target);
         disconnect.setSources([]);
-        disconnect.disposition = EmberLib.MatrixDisposition.modified;        
+        disconnect.disposition = EmberLib.MatrixDisposition.modified;
         matrix.setSources(target, []);
         if (response) {
             this.emit("matrix-disconnect", {
@@ -236,16 +242,16 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {Matrix} matrix 
-     * @param {number} target 
-     * @param {number[]} sources 
-     * @param {S101Socket} client 
-     * @param {boolean} response 
+     *
+     * @param {Matrix} matrix
+     * @param {number} target
+     * @param {number[]} sources
+     * @param {S101Socket} client
+     * @param {boolean} response
      */
     disconnectSources(matrix, target, sources, client, response) {
         const disconnect = new EmberLib.MatrixConnection(target);
-        disconnect.disposition = EmberLib.MatrixDisposition.modified;        
+        disconnect.disposition = EmberLib.MatrixDisposition.modified;
         matrix.disconnectSources(target, sources);
         if (response) {
             this.emit("matrix-disconnect", {
@@ -258,29 +264,29 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {Matrix} matrix 
-     * @param {MatrixConnection} connection 
+     *
+     * @param {Matrix} matrix
+     * @param {MatrixConnection} connection
      * @param {Matrix} res - result
-     * @param {S101Socket} client 
-     * @param {boolean} response 
+     * @param {S101Socket} client
+     * @param {boolean} response
      */
     preMatrixConnect(matrix, connection, res, client, response) {
         const conResult = res.connections[connection.target];
-        
-        if (matrix.contents.type !== EmberLib.MatrixType.nToN && 
+
+        if (matrix.contents.type !== EmberLib.MatrixType.nToN &&
             connection.operation !== EmberLib.MatrixOperation.disconnect &&
             connection.sources != null && connection.sources.length === 1) {
             if (matrix.contents.type === EmberLib.MatrixType.oneToOne) {
                 // if the source is being used already, disconnect it from current target.
                 const currentTargets = matrix.getSourceConnections(connection.sources[0]);
                 if (currentTargets.length === 1 && currentTargets[0] !== connection.target) {
-                    res.connections[currentTargets[0]] = 
+                    res.connections[currentTargets[0]] =
                     this.disconnectMatrixTarget(matrix, currentTargets[0], connection.sources, client, response);
                 }
             }
             // if the target is connected already, disconnect it
-            if (matrix.connections[connection.target].sources != null && 
+            if (matrix.connections[connection.target].sources != null &&
                 matrix.connections[connection.target].sources.length === 1) {
                 if (matrix.contents.type === EmberLib.MatrixType.oneToN) {
                     const disconnectSource = this.getDisconnectSource(matrix, connection.target);
@@ -318,23 +324,23 @@ class TreeServer extends EventEmitter{
             emitType = "matrix-connect";
         }
         conResult.disposition = EmberLib.MatrixDisposition.modified;
-        if (response && emitType != null) {            
+        if (response && emitType != null) {
             // We got a request so emit something.
             this.emit(emitType, {
                 target: connection.target,
                 sources: connection.sources,
                 client: client == null ? null : client.remoteAddress()
             });
-        }   
+        }
     }
 
     /**
-     * 
-     * @param {Matrix} matrix 
-     * @param {MatrixConnection} connection 
+     *
+     * @param {Matrix} matrix
+     * @param {MatrixConnection} connection
      * @param {Matrix} res - result
-     * @param {S101Socket} client 
-     * @param {boolean} response 
+     * @param {S101Socket} client
+     * @param {boolean} response
      */
     applyMatrixOneToNDisconnect(matrix, connection, res, client, response) {
         const disconnectSource = this.getDisconnectSource(matrix, connection.target);
@@ -359,8 +365,8 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {TreeNode} element 
+     *
+     * @param {TreeNode} element
      */
     replaceElement(element) {
         const path = element.getPath();
@@ -381,8 +387,8 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {TreeNode} element 
+     *
+     * @param {TreeNode} element
      * @param {string|number} value
      * @param {S101Socket} origin
      * @param {string} key
@@ -398,13 +404,34 @@ class TreeServer extends EventEmitter{
                 if (element.isParameter() &&
                     (element.contents.access != null) &&
                     (element.contents.access.value > 1)) {
-                    element.contents.value = value;
-                    winston.debug("New value ", value, "path", element.getPath());
+                    if (this.checkValue(element, value, key)) {
+                      if (this.setValueFn === null) {
+                        element.contents.value = value;
+                        winston.debug("New value ", value, "path", element.getPath());
+                      } else {
+                        this.setValueFn(element, value, key, (err) => {
+                          if (err === null) {
+                            element.contents.value = value;
+                            winston.debug("New value ", value, "path", element.getPath());
+                          }
+                        });
+                      }
+                    }
                     const res = this.getResponse(element);
-                    this.updateSubscribers(element.getPath(),res, origin);                    
+                    this.updateSubscribers(element.getPath(),res, origin);
                 }
                 else if ((key != null) && (element.contents.hasOwnProperty(key))) {
-                    element.contents[key] = value;
+                    if (this.checkValue(element, value, key)) {
+                      if (this.setValueFn === null) {
+                        element.contents[key] = value;
+                      } else {
+                        this.setValueFn(element, value, key, (err) => {
+                          if (err === null) {
+                            element.contents[key] = value;
+                          }
+                        });
+                      }
+                    }
                     const res = this.getResponse(element);
                     this.updateSubscribers(element.getPath(),res, origin);
                 }
@@ -417,9 +444,38 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {S101Socket} client 
-     * @param {TreeNode} root 
+     *
+     * @param {TreeNode} element
+     * @param {string|number} value
+     * @param {S101Socket} origin
+     * @param {string} key
+     */
+    checkValue(element, value, key) {
+      let result = true;
+      if (element.contents.type.value === 1) {
+        if (element.contents.minimum !== undefined && element.contents.maximum === undefined) {
+          if (value < element.contents.minimum) {
+            result = false;
+          }
+        } else if (element.contents.minimum === undefined && element.contents.maximum !== undefined) {
+          if (value > element.contents.maximum) {
+            result = false;
+          }
+        } else if (element.contents.minimum !== undefined && element.contents.maximum !== undefined) {
+          if (
+            value > element.contents.maximum || value < element.contents.minimum
+          ) {
+            result = false;
+          }
+        }
+      }
+      return result;
+    }
+
+    /**
+     *
+     * @param {S101Socket} client
+     * @param {TreeNode} root
      */
     subscribe(client, element) {
         const path = element.getPath();
@@ -437,14 +493,14 @@ class TreeServer extends EventEmitter{
             return [];
         }
         const elements = this.tree.getChildren();
-    
+
         return elements.map(element => element.toJSON());
     }
 
     /**
-     * 
-     * @param {S101Client} client 
-     * @param {TreeNode} root 
+     *
+     * @param {S101Client} client
+     * @param {TreeNode} root
      */
     unsubscribe(client, element) {
         const path = element.getPath();
@@ -455,17 +511,17 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {string} path 
-     * @param {TreeNode} response 
-     * @param {S101Socket} origin 
+     *
+     * @param {string} path
+     * @param {TreeNode} response
+     * @param {S101Socket} origin
      */
     updateSubscribers(path, response, origin) {
         if (this.subscribers[path] == null) {
             winston.debug("No subscribers for", path);
             return;
         }
-    
+
         for (let client of this.subscribers[path]) {
             if (client === origin) {
                 continue; // already sent the response to origin
@@ -483,8 +539,8 @@ class TreeServer extends EventEmitter{
     }
 
     /**
-     * 
-     * @param {object} obj 
+     *
+     * @param {object} obj
      * @returns {TreeNode}
      */
     static JSONtoTree(obj) {
