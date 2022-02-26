@@ -327,6 +327,7 @@ class TreeServer extends EventEmitter{
         if (response && emitType != null) {
             // We got a request so emit something.
             this.emit(emitType, {
+                parent: matrix._parent.contents,
                 target: connection.target,
                 sources: connection.sources,
                 client: client == null ? null : client.remoteAddress()
