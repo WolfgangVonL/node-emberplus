@@ -23,6 +23,7 @@ class TreeServer extends EventEmitter{
         this.clients = new Set();
         this.subscribers = {};
         this._handlers = new ElementHandlers(this);
+        this.forceServerWrite = false;
 
         if (this._debug === true) {
           winston.level = 'debug';
@@ -403,8 +404,9 @@ class TreeServer extends EventEmitter{
             }
             if (element.isParameter() || element.isMatrix()) {
                 if (element.isParameter() &&
-                    (element.contents.access != null) &&
-                    (element.contents.access.value > 1)) {
+                    (((element.contents.access != null) &&
+                    (element.contents.access.value > 1)) ||
+                     this.forceServerWrite === true)) {
                     if (this.checkValue(element, value, key)) {
                       if (this.setValueFn === null) {
                         element.contents.value = value;
