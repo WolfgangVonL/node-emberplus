@@ -83,6 +83,7 @@ class MatrixHandlers {
             }
             
             if (conResult.disposition == null) {
+                winston.debug(`Connection object: ${JSON.stringify(connection)}`);
                 // No decision made yet
                 if (connection.operation !== EmberLib.MatrixOperation.disconnect &&
                     connection.sources != null && connection.sources.length > 0 &&
