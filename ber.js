@@ -124,7 +124,8 @@ ExtendedReader.prototype.readReal = function(tag) {
     var buf = this.readString(b, true);
 
     if(buf.length == 0) {
-        return 0;
+        //return 0;
+        return 0.0001;
     }
 
     //console.log(buf);
@@ -187,7 +188,12 @@ ExtendedReader.prototype.readReal = function(tag) {
     fbuf.writeUInt32LE(bits.getLowBitsUnsigned(), 0);
     fbuf.writeUInt32LE(bits.getHighBitsUnsigned(), 4);
 
-    return fbuf.readDoubleLE(0);
+    //return fbuf.readDoubleLE(0);
+    let convertedValue = fbuf.readDoubleLE(0);
+    if (Number.isInteger(convertedValue)) {
+        convertedValue = parseFloat(String(convertedValue) + '.0001');
+    }
+    return convertedValue;
 }
 
 function ExtendedWriter(options) {
